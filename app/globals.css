@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-body: #E2E8F0;
+  --color-secondary: #A0ADB8;
+  --color-muted: #8B949E;
+  --color-surface: #0a0a0a;
+  --color-accent: #818CF8;
+  --color-accent-strong: #A5B4FC;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-body);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    background: #ffffff !important;
+  }
+
+  header {
+    border-color: #e5e5e5 !important;
+  }
+
+  header * {
+    color: #1a1a1a !important;
+  }
+
+  header .accent-dot {
+    background: #6366f1 !important;
+  }
+
+  article {
+    padding: 0 !important;
+  }
+
+  .brief-header {
+    border-color: #e5e5e5 !important;
+  }
+
+  .brief-header h2,
+  .brief-header p {
+    color: #1a1a1a !important;
+  }
+
+  .brief-header .brief-label {
+    color: #6366f1 !important;
+  }
+
+  .brief-header .brief-tagline {
+    color: #555 !important;
+  }
+
+  section[data-section] {
+    background: #fafafa !important;
+    border-color: #e5e5e5 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  section[data-section] h3 {
+    color: #333 !important;
+  }
+
+  section[data-section] .section-number {
+    color: #6366f1 !important;
+  }
+
+  section[data-section] p,
+  section[data-section] li {
+    color: #333 !important;
+  }
+
+  section[data-section] .label-text {
+    color: #666 !important;
+  }
+
+  section[data-section] .label-strength {
+    color: #16a34a !important;
+  }
+
+  section[data-section] .label-gap {
+    color: #d97706 !important;
+  }
+
+  section[data-section] .label-threat {
+    color: #dc2626 !important;
+  }
+
+  section[data-section] .accent-value {
+    color: #4f46e5 !important;
+  }
+
+  .impact-badge {
+    border: 1px solid #ccc !important;
+    background: transparent !important;
+    color: #333 !important;
+  }
+
+  .war-room-card {
+    background: #f5f5f5 !important;
+    border-color: #ddd !important;
+  }
+
+  .quick-win-card {
+    background: #f5f5f5 !important;
+    border-color: #ddd !important;
+  }
+
+  footer {
+    border-color: #e5e5e5 !important;
+  }
+
+  footer p {
+    color: #999 !important;
+  }
+}
