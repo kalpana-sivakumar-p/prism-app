@@ -46,12 +46,12 @@ interface Brief {
 
 const MAX_COMPETITORS = 3;
 
-const LOADING_STEPS = [
-  "Reading homepage",
-  "Analysing messaging strategy",
-  "Mapping competitive landscape",
-  "Identifying voice gaps",
-  "Writing your brief",
+const LOADING_MESSAGES = [
+  "Reading homepage…",
+  "Analysing messaging strategy…",
+  "Mapping competitive landscape…",
+  "Identifying voice gaps…",
+  "Writing your brief…",
 ];
 
 const SAMPLE_BRIEF: Brief = {
@@ -165,12 +165,24 @@ export default function Home() {
       return;
     }
     const interval = setInterval(() => {
-      setLoadingStep((prev) =>
-        prev < LOADING_STEPS.length - 1 ? prev + 1 : prev
-      );
+      setLoadingStep((prev) => (prev + 1) % LOADING_MESSAGES.length);
     }, 3000);
     return () => clearInterval(interval);
   }, [loading]);
+
+  useEffect(() => {
+    if (brief) {
+      window.history.pushState({ brief: true }, "");
+    }
+  }, [brief]);
+
+  useEffect(() => {
+    function onPopState() {
+      setBrief(null);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   function addCompetitor() {
     if (competitorUrls.length < MAX_COMPETITORS) {
@@ -327,37 +339,14 @@ export default function Home() {
           )}
 
           {loading && (
-            <div className="mt-12 flex flex-col items-start max-w-xs mx-auto space-y-3">
-              {LOADING_STEPS.map((step, i) => {
-                if (i > loadingStep) return null;
-                const isCompleted = i < loadingStep;
-                const isActive = i === loadingStep;
-
-                return (
-                  <div
-                    key={step}
-                    className="animate-fade-in-up flex items-center gap-3"
-                  >
-                    {isCompleted && (
-                      <span className="text-emerald-400 text-sm w-4 text-center">
-                        &#10003;
-                      </span>
-                    )}
-                    {isActive && (
-                      <span className="flex w-4 justify-center">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse-slow" />
-                      </span>
-                    )}
-                    <span
-                      className={`text-sm ${
-                        isCompleted ? "text-[#8B949E]" : "text-[#E2E8F0]"
-                      }`}
-                    >
-                      {step}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="mt-16 flex flex-col items-center gap-6">
+              <div className="loading-spinner" />
+              <p
+                key={loadingStep}
+                className="loading-text-fade text-sm text-[#A0ADB8]"
+              >
+                {LOADING_MESSAGES[loadingStep]}
+              </p>
             </div>
           )}
 
@@ -626,7 +615,18 @@ function BriefDisplay({
         </Section>
       </div>
 
-      <footer className="mt-16 pt-6 border-t border-white/[0.06] text-center">
+      {!isSample && (
+        <div className="no-print mt-10 text-center">
+          <button
+            onClick={onNewBrief}
+            className="text-sm text-[#A5B4FC]/80 hover:text-[#A5B4FC] transition-colors cursor-pointer"
+          >
+            &larr; Analyse another company
+          </button>
+        </div>
+      )}
+
+      <footer className="mt-10 pt-6 border-t border-white/[0.06] text-center">
         <p className="text-xs text-[#8B949E]">
           PRISM &middot; Messaging intelligence, powered by Claude
         </p>
