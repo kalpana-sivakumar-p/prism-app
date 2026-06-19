@@ -1,7 +1,63 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import * as cheerio from "cheerio";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const SCRAPE_PATHS = ["/", "/product", "/products", "/pricing", "/about", "/blog"];
+
+async function fetchPageText(pageUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(pageUrl, {
+      headers: { "User-Agent": "PrismBot/1.0 (messaging-analysis)" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    $("script, style, nav, footer, header, noscript, iframe, svg").remove();
+    const text = $("body").text().replace(/\s+/g, " ").trim();
+    return text.length > 50 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeBaseUrl(raw: string): string {
+  let u = raw.trim();
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  const parsed = new URL(u);
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
+interface ScrapeResult {
+  scrapedPages: string[];
+  context: string;
+}
+
+async function scrapesite(url: string): Promise<ScrapeResult> {
+  const base = normalizeBaseUrl(url);
+  const fetches = SCRAPE_PATHS.map(async (path) => {
+    const fullUrl = base + path;
+    const text = await fetchPageText(fullUrl);
+    return { path, text };
+  });
+
+  const results = await Promise.all(fetches);
+  const scrapedPages: string[] = [];
+  const blocks: string[] = [];
+
+  for (const { path, text } of results) {
+    if (text) {
+      scrapedPages.push(path);
+      const label = path === "/" ? "Homepage" : path;
+      blocks.push(`--- ${label} ---\n${text.slice(0, 6000)}`);
+    }
+  }
+
+  return { scrapedPages, context: blocks.join("\n\n") };
+}
 
 const PERSONA = `You are a product marketing strategist with 20+ years of experience advising category-defining B2B companies. You think in frameworks, speak in verdicts, and never waste words. Your analysis is direct, opinionated, and immediately actionable.`;
 
@@ -72,12 +128,35 @@ function buildSystemPrompt(competitorUrls: string[]): string {
   return `${PERSONA}\n\n${contextLine} Use this exact JSON schema:\n\n{\n  ${POSITIONING_AND_VOICE_SCHEMA},\n  ${competitiveBlock},\n  ${QUICK_WINS_SCHEMA}\n}\n\n${CLOSING}`;
 }
 
-function buildUserMessage(url: string, competitorUrls: string[]): string {
+function buildUserMessage(
+  url: string,
+  competitorUrls: string[],
+  primaryScrape: ScrapeResult,
+  competitorScrapes: { url: string; scrape: ScrapeResult }[]
+): string {
+  let msg = "";
+
+  if (primaryScrape.context) {
+    // Pages successfully scraped: listed here for transparency
+    msg += `I have scraped the following pages from ${url}: ${primaryScrape.scrapedPages.join(", ")}\n\n`;
+    msg += `Here is the extracted website content for the primary company:\n\n${primaryScrape.context}\n\n`;
+  }
+
+  for (const { url: compUrl, scrape } of competitorScrapes) {
+    if (scrape.context) {
+      msg += `Scraped pages from competitor ${compUrl}: ${scrape.scrapedPages.join(", ")}\n\n`;
+      msg += `Extracted content for ${compUrl}:\n\n${scrape.context}\n\n`;
+    }
+  }
+
   if (competitorUrls.length > 0) {
     const competitors = competitorUrls.map((u, i) => `Competitor ${i + 1}: ${u}`).join("\n");
-    return `Analyse this company's messaging and produce the Positioning Brief.\n\nPrimary company: ${url}\n${competitors}`;
+    msg += `Analyse this company's messaging and produce the Positioning Brief.\n\nPrimary company: ${url}\n${competitors}`;
+  } else {
+    msg += `Analyse this company's messaging and produce the Positioning Brief: ${url}`;
   }
-  return `Analyse this company's messaging and produce the Positioning Brief: ${url}`;
+
+  return msg;
 }
 
 export async function POST(request: NextRequest) {
@@ -92,6 +171,15 @@ export async function POST(request: NextRequest) {
       ? competitorUrls.filter((u: unknown) => typeof u === "string" && u.trim() !== "")
       : [];
 
+    const [primaryScrape, ...competitorScrapeResults] = await Promise.all([
+      scrapesite(url),
+      ...validCompetitors.map((compUrl) =>
+        scrapesite(compUrl).then((scrape) => ({ url: compUrl, scrape }))
+      ),
+    ]);
+
+    const competitorScrapes = competitorScrapeResults as { url: string; scrape: ScrapeResult }[];
+
     const response = await anthropic.messages.create({
       model: "claude-opus-4-8",
       max_tokens: 8192,
@@ -99,7 +187,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "user",
-          content: buildUserMessage(url, validCompetitors),
+          content: buildUserMessage(url, validCompetitors, primaryScrape, competitorScrapes),
         },
       ],
     });
